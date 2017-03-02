@@ -1,49 +1,71 @@
 package socketcmd
-/*	Copyright 2017 Ryan Clarke
 
-	This file is part of socketcmd.
+/*  Copyright 2017 Ryan Clarke
 
-	socketcmd is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
+    This file is part of Socketcmd.
 
-	Foobar is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    Socketcmd is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-	You should have received a copy of the GNU General Public License
-	along with socketcmd.  If not, see <http://www.gnu.org/licenses/>
+    Socketcmd is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Socketcmd.  If not, see <http://www.gnu.org/licenses/>
 */
 
-// DefaultTimeout is the timeout used when the parsed timeout is missing or invalid.
-var DefaultTimeout = 5000
+import (
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+)
 
-/* A ParseFunc indicates the number of lines expected to be written to stdout as a result of the
- * given command. It also indicates a timeout for the interval between lines.
- */
-type ParseFunc func(cmd string) (lines, timeout int)
+var (
+	DefaultHeader    = "-1:"
+	DefaultParseFunc = func(_ []string) string { return DefaultHeader }
+	errMissingHeader = fmt.Errorf("missing/invalid socketcmd header")
+	headerRegexp     = regexp.MustCompile("^-?[0-9]*:[0-9]*$")
+)
 
-// A ParseOpt represents a parsing result for a particular command, including line count and timeout.
-type ParseOpt struct {
-	Lines int
-	Time  int
-}
+// A ParseFunc determines the proper header for a given command.
+type ParseFunc func(args []string) string
 
-// NewParseFunc returns a new ParseFunc using the given map of parsing options and a default value.
-func NewParseFunc(opts map[string]ParseOpt, def ParseOpt) ParseFunc {
-	return func(cmd string) (lines, timeout int) {
-		if opt, ok := opts[cmd]; ok {
-			return opt.Lines, opt.Time
+// Header representation of the given line count and timeout.
+func Header(lines, timeout int) string {
+	if timeout <= 0 {
+		if lines == 0 {
+			return ":"
 		}
-		return def.Lines, def.Time
+		return fmt.Sprintf("%d:", lines)
 	}
+	if lines == 0 {
+		return fmt.Sprintf(":%d", timeout)
+	}
+	return fmt.Sprintf("%d:%d", lines, timeout)
 }
 
-// TimeoutOnlyParse returns a ParseFunc with a universal timeout for all commands
-func TimeoutOnlyParse(timeout int) ParseFunc {
-	return func(_ string) (lines, timeout int) {
-		return -1, timeout
+// ParseHeader extracts the line count and timeout from the given header.
+func ParseHeader(header string) (lines, timeout int, err error) {
+	if !headerRegexp.MatchString(header) {
+		return 0, 0, errMissingHeader
 	}
+	s := strings.Split(header, ":")
+	if len(s) != 2 {
+		return 0, 0, errMissingHeader
+	}
+	if s[0] != "" {
+		lines, err = strconv.Atoi(s[0])
+		if err != nil {
+			return
+		}
+	}
+	if s[1] != "" {
+		timeout, err = strconv.Atoi(s[1])
+	}
+	return
 }
