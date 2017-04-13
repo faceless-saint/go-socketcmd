@@ -30,8 +30,6 @@ import (
 )
 
 const (
-	// Maximum allowed timeout in milliseconds
-	//MaxTimeout = 30000
 	// Default timeout in milliseconds
 	DefaultTimeout = 1000
 	// Buffer size in bytes for incoming connections
@@ -41,6 +39,8 @@ const (
 /* A Handler manages network socket and I/O redirection.
  */
 type Handler interface {
+	// Addr returns the address of the underlying net Listener.
+	Addr() net.Addr
 	// Close the socket listener.
 	Close() error
 	// Start the goroutines for managing process I/O redirection.
@@ -67,12 +67,15 @@ type handler struct {
 	blk chan bool
 }
 
+func (h *handler) Addr() net.Addr {
+	return h.Socket.Addr()
+}
+
 func (h *handler) Close() error {
 	return h.Socket.Close()
 }
 
 func (h *handler) Start() {
-	log.Println("Starting socket handler")
 	go h.HandleSocket()
 	go h.HandleStdin()
 	go h.ListenStdin()
@@ -105,7 +108,8 @@ func (h *handler) handleConnection(conn net.Conn) error {
 	buf := make([]byte, ConnBufferSize)
 	n, err := conn.Read(buf)
 	if err != nil {
-		return err
+		_, err2 := io.WriteString(conn, err.Error()+"\n")
+		return err2
 	}
 
 	// [lines]:[timeout] args...
@@ -117,7 +121,7 @@ func (h *handler) handleConnection(conn net.Conn) error {
 	// Parse header word for line count and timeout information
 	lines, timeout, err := ParseHeader(words[0])
 	if err != nil {
-		_, err2 := io.WriteString(conn, err.Error())
+		_, err2 := io.WriteString(conn, err.Error()+"\n")
 		return err2
 	}
 
@@ -138,9 +142,7 @@ func sendResponse(conn net.Conn, resp <-chan string, lines, timeout int) error {
 	// Use default timeout if given value is out of bounds
 	if timeout <= 0 {
 		timeout = DefaultTimeout
-	} /*else if timeout > MaxTimeout {	//TODO: enable maximum timeout?
-		timeout = MaxTimeout
-	}*/
+	}
 	for {
 		// Skip line counting if lines is negative
 		if lines >= 0 && count >= lines {

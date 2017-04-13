@@ -23,12 +23,11 @@ import (
 
 	"errors"
 	"os"
-	"os/exec"
 )
 
 const EnvSocketPath = "SOCKET_PATH"
 
-var ExampleSocketPath = "example.sock"
+var ExampleSocketPath = "@example.sock"
 
 func init() {
 	// If environment variable is set, override default socket path
@@ -47,10 +46,9 @@ func main() {
 	if len(os.Args) > 2 {
 		args = os.Args[2:]
 	}
-	cmd := exec.Command(os.Args[1], args...)
+	cmd := socketcmd.Cmd(os.Args[1], args...)
 
 	// Send command to the socketcmd.Wrapper
-	os.Remove(ExampleSocketPath)
 	s, err := socketcmd.NewUnix(ExampleSocketPath, cmd)
 	if err != nil {
 		panic(err)

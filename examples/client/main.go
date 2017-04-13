@@ -22,6 +22,7 @@ import (
 	"github.com/faceless-saint/go-socketcmd"
 
 	"os"
+	"strings"
 )
 
 const EnvSocketPath = "SOCKET_PATH"
@@ -41,7 +42,9 @@ func main() {
 	client := socketcmd.NewClient("unix", ExampleSocketPath, nil)
 
 	// Send command line arguments to the socket
-	if err := client.Send(os.Args[1:]...); err != nil {
+	if resp, err := client.Send(os.Args[1:]...); err != nil {
 		panic(err)
+	} else {
+		fmt.Println(strings.Join(resp, "\n"))
 	}
 }
